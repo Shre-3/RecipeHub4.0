@@ -1,4 +1,4 @@
-# RecipeHub
+# RecipeHub 🍽️
 
 A full-stack, **Dockerized** **MERN** recipe platform powered by the [Forkify API](https://forkify-api.herokuapp.com/). Search recipes, match what is in your pantry, plan weekly meals, and save favourites. It has optional diet, allergy, and cuisine filters on every search flow.
 
