@@ -2,72 +2,36 @@ const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
 const Bookmark = require("../models/Bookmark");
-const Recipe = require("../models/Recipe");
-const axios = require("axios");
+const recipeService = require("../services/recipeService");
+const { toClientRecipe } = require("../utils/recipeMapper");
 
-// Get all bookmarks for the authenticated user
 router.get("/", auth, async (req, res) => {
   try {
-    const bookmarks = await Bookmark.find({ user: req.user.userId });
-
-    // Fetch recipe details for each bookmark
-    const recipesPromises = bookmarks.map(async (bookmark) => {
-      try {
-        // First check if it's an AI-generated recipe in our database
-        const localRecipe = await Recipe.findById(bookmark.recipeId);
-        if (localRecipe) {
-          return {
-            id: localRecipe._id,
-            name: localRecipe.title,
-            ingredients: localRecipe.ingredients,
-            instructions: localRecipe.instructions,
-            image: localRecipe.image_url,
-            cookTime: localRecipe.cooking_time,
-            servings: localRecipe.servings,
-            isAIGenerated: localRecipe.isAIGenerated,
-            sourceUrl: localRecipe.sourceUrl || "",
-          };
-        }
-
-        // If not found locally, try fetching from external API
-        const response = await axios.get(
-          `${process.env.RECIPE_API_URL}/${bookmark.recipeId}`
-        );
-        const recipe = response.data.data.recipe;
-        return {
-          id: recipe.id,
-          name: recipe.title,
-          publisher: recipe.publisher || "",
-          ingredients: recipe.ingredients
-            ? recipe.ingredients.map((ing) => ({
-                quantity: ing.quantity || null,
-                unit: ing.unit || "",
-                description: ing.description || "",
-              }))
-            : [],
-          image: recipe.image_url,
-          cookTime: recipe.cooking_time || null,
-          servings: recipe.servings || null,
-          sourceUrl: recipe.source_url || "",
-          isAIGenerated: false,
-        };
-      } catch (error) {
-        console.error(`Error fetching recipe ${bookmark.recipeId}:`, error);
-        return null;
-      }
+    const bookmarks = await Bookmark.find({ user: req.user.userId }).sort({
+      createdAt: -1,
     });
 
-    const recipes = (await Promise.all(recipesPromises)).filter(
-      (recipe) => recipe !== null
-    );
+    const recipes = [];
+
+    for (const bookmark of bookmarks) {
+      try {
+        const recipe = await recipeService.getOrFetch(bookmark.recipeId);
+        recipes.push({
+          ...toClientRecipe(recipe),
+          isBookmarked: true,
+        });
+      } catch (error) {
+        console.error(`Failed to load bookmark ${bookmark.recipeId}`);
+      }
+    }
+
     res.json(recipes);
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("Bookmark fetch error:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// Check if a recipe is bookmarked
 router.get("/check/:recipeId", auth, async (req, res) => {
   try {
     const bookmark = await Bookmark.findOne({
@@ -76,21 +40,25 @@ router.get("/check/:recipeId", auth, async (req, res) => {
     });
 
     res.json({ isBookmarked: !!bookmark });
-  } catch (err) {
-    console.error("Error checking bookmark status:", err);
+  } catch (error) {
+    console.error("Bookmark check error:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// Add a bookmark
 router.post("/", auth, async (req, res) => {
   try {
-    const { recipe } = req.body;
+    const { recipeId } = req.body;
 
-    // Check if already bookmarked
+    if (!recipeId) {
+      return res.status(400).json({ message: "Recipe ID is required" });
+    }
+
+    await recipeService.getOrFetch(recipeId);
+
     const existingBookmark = await Bookmark.findOne({
       user: req.user.userId,
-      recipeId: recipe.id,
+      recipeId,
     });
 
     if (existingBookmark) {
@@ -99,18 +67,17 @@ router.post("/", auth, async (req, res) => {
 
     const bookmark = new Bookmark({
       user: req.user.userId,
-      recipeId: recipe.id,
+      recipeId,
     });
 
     await bookmark.save();
-    res.json({ message: "Bookmark added successfully" });
-  } catch (err) {
-    console.error("Error adding bookmark:", err);
+    res.status(201).json({ message: "Bookmark added successfully" });
+  } catch (error) {
+    console.error("Bookmark add error:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// Remove a bookmark
 router.delete("/:recipeId", auth, async (req, res) => {
   try {
     const bookmark = await Bookmark.findOneAndDelete({
@@ -123,8 +90,8 @@ router.delete("/:recipeId", auth, async (req, res) => {
     }
 
     res.json({ message: "Bookmark removed successfully" });
-  } catch (err) {
-    console.error("Error removing bookmark:", err);
+  } catch (error) {
+    console.error("Bookmark delete error:", error.message);
     res.status(500).json({ message: "Server error" });
   }
 });

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { ChefHat } from "lucide-react";
+import { PasswordInput } from "./PasswordInput";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -98,30 +99,26 @@ const Register = () => {
               <label htmlFor="password" className="sr-only">
                 Password
               </label>
-              <input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1f5129] focus:border-[#1f5129] focus:z-10 sm:text-sm"
                 placeholder="Password"
                 value={password}
                 onChange={handleChange}
+                className="rounded-none"
               />
             </div>
             <div>
               <label htmlFor="confirmPassword" className="sr-only">
                 Confirm Password
               </label>
-              <input
+              <PasswordInput
                 id="confirmPassword"
                 name="confirmPassword"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-2 focus:ring-[#1f5129] focus:border-[#1f5129] focus:z-10 sm:text-sm"
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={handleChange}
+                className="rounded-none rounded-b-md"
               />
             </div>
           </div>

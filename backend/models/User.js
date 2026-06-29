@@ -19,12 +19,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  bookmarks: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Recipe",
-    },
-  ],
+  preferences: {
+    diets: [String],
+    allergies: [String],
+    cuisines: [String],
+  },
   createdAt: {
     type: Date,
     default: Date.now,

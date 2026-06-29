@@ -4,11 +4,11 @@ import { searchRecipes, getRecipeById } from "../api/recipeApi";
 export function useRecipes() {
   const [recipes, setRecipes] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Handle hash changes
   useEffect(() => {
     const loadRecipeFromHash = async () => {
       const hash = window.location.hash.slice(1);
@@ -17,7 +17,7 @@ export function useRecipes() {
         return;
       }
 
-      setLoading(true);
+      setDetailLoading(true);
       setError(null);
 
       try {
@@ -27,7 +27,7 @@ export function useRecipes() {
         setError(err.message);
         setSelectedRecipe(null);
       } finally {
-        setLoading(false);
+        setDetailLoading(false);
       }
     };
 
@@ -42,7 +42,7 @@ export function useRecipes() {
       return;
     }
 
-    setLoading(true);
+    setListLoading(true);
     setError(null);
     setCurrentPage(1);
 
@@ -53,7 +53,7 @@ export function useRecipes() {
       setError(err.message);
       setRecipes([]);
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
   }, []);
 
@@ -71,7 +71,8 @@ export function useRecipes() {
   return {
     recipes,
     selectedRecipe,
-    loading,
+    listLoading,
+    detailLoading,
     error,
     currentPage,
     setCurrentPage,

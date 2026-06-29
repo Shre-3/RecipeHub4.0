@@ -20,9 +20,11 @@ export function RecipeList({
   error,
   currentPage,
   setCurrentPage,
+  showReason = false,
+  showMatchPercent = false,
+  emptyMessage = "Start by searching for a recipe above",
 }) {
   if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} />;
 
   if (recipes.length === 0) {
     return (
@@ -35,13 +37,17 @@ export function RecipeList({
           Welcome to RecipeHub!
         </h2>
         <p className="text-gray-600 mb-6 max-w-sm">
-          Discover delicious recipes from around the world or let our AI help
-          you create something unique with ingredients you have.
+          Discover recipes, match your pantry ingredients, and plan weekly meals
+          with optional diet and cuisine filters.
         </p>
-        <div className="flex items-center gap-2 text-[#1f5129]/70 bg-[#1f5129]/5 px-4 py-2 rounded-lg">
-          <Search className="w-5 h-5" />
-          <span>Start by searching for a recipe above</span>
-        </div>
+        {error ? (
+          <ErrorMessage message={error} />
+        ) : (
+          <div className="flex items-center gap-2 text-[#1f5129]/70 bg-[#1f5129]/5 px-4 py-2 rounded-lg">
+            <Search className="w-5 h-5" />
+            <span>{emptyMessage}</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -62,6 +68,8 @@ export function RecipeList({
             recipe={recipe}
             isSelected={selectedRecipe?.id === recipe.id}
             onClick={() => onSelectRecipe(recipe)}
+            showReason={showReason}
+            showMatchPercent={showMatchPercent}
           />
         ))}
       </div>

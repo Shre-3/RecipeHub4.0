@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { BookmarkIcon, ChefHat } from "lucide-react";
 import { RecipeList } from "./RecipeList";
 import { RecipeDetail } from "./RecipeDetail";
-import { Loader2, BookmarkIcon, ChefHat } from "lucide-react";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { PageLayout } from "./layout/PageLayout";
+import { getBookmarks } from "../api/recipeApi";
 
 export function BookmarkedRecipes() {
   const [bookmarkedRecipes, setBookmarkedRecipes] = useState([]);
@@ -14,39 +16,10 @@ export function BookmarkedRecipes() {
   const fetchBookmarkedRecipes = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
-
-      const response = await axios({
-        method: "get",
-        url: `${baseUrl}/api/bookmarks`,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      // Transform the bookmarked recipes to match our app's format
-      const formattedRecipes = response.data.map((recipe) => ({
-        id: recipe.id,
-        name: recipe.name,
-        description: recipe.name,
-        image: recipe.isAIGenerated ? null : recipe.image,
-        sourceUrl: recipe.sourceUrl,
-        cookTime: recipe.cookTime || 30,
-        servings: recipe.servings || 4,
-        ingredients: recipe.ingredients || [],
-        instructions: recipe.instructions || [],
-        isBookmarked: true,
-        _id: recipe.id,
-        publisher: recipe.publisher,
-        isExternalRecipe: true,
-        isAIGenerated: recipe.isAIGenerated === true,
-      }));
-
-      setBookmarkedRecipes(formattedRecipes);
+      const recipes = await getBookmarks();
+      setBookmarkedRecipes(recipes);
       setError(null);
-    } catch (err) {
+    } catch {
       setError("Unable to load bookmarked recipes");
       setBookmarkedRecipes([]);
     } finally {
@@ -54,39 +27,29 @@ export function BookmarkedRecipes() {
     }
   };
 
-  // Initial fetch
   useEffect(() => {
     fetchBookmarkedRecipes();
   }, []);
 
-  // Listen for bookmark updates
   useEffect(() => {
-    const handleBookmarkUpdate = () => {
-      fetchBookmarkedRecipes();
-    };
-
+    const handleBookmarkUpdate = () => fetchBookmarkedRecipes();
     window.addEventListener("bookmarkUpdated", handleBookmarkUpdate);
     return () =>
       window.removeEventListener("bookmarkUpdated", handleBookmarkUpdate);
   }, []);
 
-  const handleSelectRecipe = (recipe) => {
-    setSelectedRecipe(recipe);
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1f5129]/10 to-[#f0e4cc]/30 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold text-[#1f5129] mb-6 flex items-center gap-3">
+    <PageLayout className="bg-gradient-to-br from-[#1f5129]/10 to-[#f0e4cc]/30">
+      <h1 className="text-2xl font-bold text-[#1f5129] flex items-center justify-center gap-3 text-center">
           <BookmarkIcon className="w-8 h-8" />
           Your Bookmarked Recipes
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-          <div className="lg:col-span-5 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-lg shadow-lg">
+          <div className="lg:col-span-5 bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-lg shadow-lg">
             {loading ? (
               <div className="flex justify-center items-center p-8">
-                <Loader2 className="w-8 h-8 text-[#1f5129] animate-spin" />
+                <LoadingSpinner />
               </div>
             ) : error ? (
               <div className="text-red-500 text-center py-4">{error}</div>
@@ -98,14 +61,14 @@ export function BookmarkedRecipes() {
                 </h3>
                 <p className="text-gray-600 max-w-sm">
                   Start exploring recipes and bookmark your favorites to see
-                  them here!
+                  them here.
                 </p>
               </div>
             ) : (
               <RecipeList
                 recipes={bookmarkedRecipes}
                 selectedRecipe={selectedRecipe}
-                onSelectRecipe={handleSelectRecipe}
+                onSelectRecipe={setSelectedRecipe}
                 loading={loading}
                 error={error}
                 currentPage={currentPage}
@@ -114,16 +77,14 @@ export function BookmarkedRecipes() {
             )}
           </div>
 
-          <div className="lg:col-span-7 bg-white/50 backdrop-blur-sm p-4 sm:p-6 rounded-lg shadow-lg">
+          <div className="lg:col-span-7 bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-lg shadow-lg">
             <RecipeDetail
               recipe={selectedRecipe}
               loading={loading}
               error={error}
-              isBookmarked={true}
             />
           </div>
         </div>
-      </div>
-    </div>
+    </PageLayout>
   );
 }

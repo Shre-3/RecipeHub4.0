@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from "react";
 import {
+  UtensilsCrossed,
   Clock,
   Users,
   Plus,
   Minus,
-  ExternalLink,
-  UtensilsCrossed,
   Bookmark,
 } from "lucide-react";
 import { LoadingSpinner } from "./LoadingSpinner";
-import axios from "axios";
-import { useAuth } from "../context/AuthContext";
-import { AIRecipeDetail } from "./AIRecipeDetail";
-import { RegularRecipeDetail } from "./RegularRecipeDetail";
+import { ErrorMessage } from "./ErrorMessage";
 import { RecipeContent } from "./RecipeContent";
+import { useAuth } from "../context/AuthContext";
+import { formatCookTime } from "../utils/text";
+import {
+  checkBookmark,
+  addBookmark,
+  removeBookmark,
+} from "../api/recipeApi";
 
 export function RecipeDetail({ recipe, loading, error }) {
   const { user } = useAuth();
@@ -22,115 +25,37 @@ export function RecipeDetail({ recipe, loading, error }) {
   const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
 
   useEffect(() => {
-    const checkBookmarkStatus = async () => {
-      if (!recipe || !user) return;
+    const loadBookmarkStatus = async () => {
+      if (!recipe?.id || !user) return;
 
       try {
-        const token = localStorage.getItem("token");
-        if (!token) return;
-
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_BOOKMARKS}/check/${
-            recipe._id || recipe.id
-          }`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        setIsBookmarked(response.data.isBookmarked);
-      } catch (err) {
+        const bookmarked = await checkBookmark(recipe.id);
+        setIsBookmarked(bookmarked);
+      } catch {
         setIsBookmarked(false);
       }
     };
 
-    checkBookmarkStatus();
+    loadBookmarkStatus();
     setServings(recipe?.servings || 1);
   }, [recipe, user]);
 
   const toggleBookmark = async () => {
+    if (!recipe?.id) return;
+
     try {
       setIsBookmarkLoading(true);
-      const token = localStorage.getItem("token");
-      const baseUrl = import.meta.env.VITE_API_URL.replace("/api", "");
 
       if (!isBookmarked) {
-        const transformedRecipe = {
-          title: recipe.name || recipe.title,
-          description: recipe.description || recipe.name || recipe.title,
-          ingredients: recipe.ingredients.map((ing) => ({
-            quantity: ing.quantity || 0,
-            unit: ing.unit || "",
-            description: ing.description || "",
-          })),
-          instructions: recipe.instructions || [],
-          cooking_time: recipe.cookTime || recipe.cooking_time || 30,
-          servings: recipe.servings || 4,
-          image_url: recipe.image,
-          sourceUrl: recipe.sourceUrl || "",
-          isExternalRecipe: true,
-          external_id: recipe.id,
-          publisher: recipe.publisher,
-          isAIGenerated: recipe.isAIGenerated,
-        };
-
-        const recipeResponse = await axios.post(
-          `${baseUrl}/api/recipes`,
-          transformedRecipe,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        recipe._id = recipeResponse.data._id;
-
-        await axios.post(
-          `${baseUrl}/api/bookmarks`,
-          {
-            recipe: {
-              id: recipeResponse.data._id,
-              sourceUrl: recipe.sourceUrl || "",
-              isAIGenerated: recipe.isAIGenerated || false,
-            },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
+        await addBookmark(recipe.id);
         setIsBookmarked(true);
       } else {
-        if (!recipe._id) {
-          const checkResponse = await axios.get(
-            `${baseUrl}/api/recipes/external/${recipe.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-          recipe._id = checkResponse.data._id;
-        }
-
-        await axios.delete(`${baseUrl}/api/bookmarks/${recipe._id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-
+        await removeBookmark(recipe.id);
         setIsBookmarked(false);
       }
 
       window.dispatchEvent(new CustomEvent("bookmarkUpdated"));
-    } catch (err) {
+    } catch {
       alert("Unable to update bookmark. Please try again.");
     } finally {
       setIsBookmarkLoading(false);
@@ -138,34 +63,80 @@ export function RecipeDetail({ recipe, loading, error }) {
   };
 
   if (loading) return <LoadingSpinner />;
-  if (error) return <div className="text-red-500">{error}</div>;
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[320px] h-full p-6">
+        <ErrorMessage message={error} />
+      </div>
+    );
+  }
   if (!recipe) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500">
-        <UtensilsCrossed className="w-6 h-6 mr-2" />
+      <div className="flex flex-col items-center justify-center min-h-[320px] h-full text-gray-500 text-center">
+        <UtensilsCrossed className="w-8 h-8 mb-2" />
         <p>Select a recipe to view details</p>
       </div>
     );
   }
 
-  const handleServingsChange = (delta) => {
-    const newServings = Math.max(1, servings + delta);
-    setServings(newServings);
-  };
+  return (
+    <div>
+      <div className="flex items-start justify-between">
+        <h2 className="text-2xl font-bold text-[#1f5129]">{recipe.name}</h2>
+        {user && (
+          <button
+            onClick={toggleBookmark}
+            disabled={isBookmarkLoading}
+            className={`p-2 rounded-full transition-colors ${
+              isBookmarked
+                ? "text-[#1f5129] bg-[#1f5129]/10"
+                : "text-gray-500 hover:bg-gray-100"
+            }`}
+          >
+            <Bookmark
+              className={`w-6 h-6 ${isBookmarkLoading ? "animate-pulse" : ""}`}
+              fill={isBookmarked ? "#1f5129" : "none"}
+              stroke={isBookmarked ? "#1f5129" : "currentColor"}
+            />
+          </button>
+        )}
+      </div>
 
-  const sharedProps = {
-    recipe,
-    servings,
-    onServingsChange: handleServingsChange,
-    user,
-    isBookmarked,
-    onBookmark: toggleBookmark,
-    isBookmarkLoading,
-  };
+      <div className="mt-4">
+        <img
+          src={recipe.image}
+          alt={recipe.name}
+          className="w-full h-64 object-cover rounded-lg"
+        />
+      </div>
 
-  return recipe.isAIGenerated ? (
-    <AIRecipeDetail {...sharedProps} />
-  ) : (
-    <RegularRecipeDetail {...sharedProps} />
+      <div className="mt-4 flex items-center gap-6 text-[#1f5129]">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          <span>{formatCookTime(recipe.cookTime)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Users className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setServings((current) => Math.max(1, current - 1))}
+              disabled={servings <= 1}
+              className="p-1 rounded-full hover:bg-[#1f5129]/10 disabled:opacity-50"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span>{servings} servings</span>
+            <button
+              onClick={() => setServings((current) => current + 1)}
+              className="p-1 rounded-full hover:bg-[#1f5129]/10"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <RecipeContent recipe={recipe} servings={servings} />
+    </div>
   );
 }

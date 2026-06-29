@@ -1,105 +1,32 @@
 const express = require("express");
 const router = express.Router();
-const { check, validationResult } = require("express-validator");
-const recipeController = require("../controllers/recipeController");
-const Recipe = require("../models/Recipe");
-const auth = require("../middleware/auth");
+const recipeService = require("../services/recipeService");
 
-// @route   POST api/recipes
-// @desc    Create a recipe
-router.post("/", auth, async (req, res) => {
+router.get("/search", async (req, res) => {
   try {
-    // If it's an AI-generated recipe, use different validation
-    if (req.body.isAIGenerated) {
-      const recipe = new Recipe({
-        title: req.body.title,
-        description: req.body.description || req.body.title,
-        ingredients: req.body.ingredients,
-        instructions: req.body.instructions,
-        cooking_time: req.body.cooking_time,
-        servings: req.body.servings,
-        image_url: req.body.image_url,
-        isAIGenerated: true,
-        creator: req.user.userId,
-        sourceUrl: req.body.sourceUrl || "",
-      });
+    const { q } = req.query;
 
-      const savedRecipe = await recipe.save();
-      res.json(savedRecipe);
-    } else {
-      // For regular recipes, use the existing validation and controller
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const recipe = new Recipe({
-        ...req.body,
-        creator: req.user.userId,
-      });
-
-      await recipe.save();
-      res.status(201).json(recipe);
-    }
-  } catch (err) {
-    console.error("Error saving recipe:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to save recipe", error: err.message });
-  }
-});
-
-// @route   GET api/recipes
-// @desc    Get all recipes
-router.get("/", async (req, res) => {
-  try {
-    const { search } = req.query;
-    let query = {};
-
-    if (search) {
-      query = {
-        $or: [
-          { title: { $regex: search, $options: "i" } },
-          { description: { $regex: search, $options: "i" } },
-        ],
-      };
+    if (!q || !q.trim()) {
+      return res.status(400).json({ message: "Search query is required" });
     }
 
-    const recipes = await Recipe.find(query)
-      .populate("creator", "username")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      data: {
-        recipes: recipes.map((recipe) => ({
-          id: recipe._id,
-          title: recipe.title,
-          publisher: recipe.creator?.username || "",
-          image_url: recipe.image_url,
-          cooking_time: recipe.cooking_time,
-          servings: recipe.servings,
-          ingredients: recipe.ingredients,
-          sourceUrl: recipe.sourceUrl || "",
-          isAIGenerated: recipe.isAIGenerated || false,
-        })),
-      },
-    });
+    const recipes = await recipeService.searchAndCache(q.trim());
+    res.json({ data: { recipes } });
   } catch (error) {
-    console.error("Search error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Search error:", error.message);
+    const status = error.statusCode || 500;
+    res.status(status).json({ message: error.message || "Failed to search recipes" });
   }
 });
 
-// @route   GET api/recipes/user
-// @desc    Get user's recipes
-router.get("/user", auth, recipeController.getUserRecipes);
-
-// @route   PUT api/recipes/:id
-// @desc    Update recipe
-router.put("/:id", auth, recipeController.updateRecipe);
-
-// @route   DELETE api/recipes/:id
-// @desc    Delete recipe
-router.delete("/:id", auth, recipeController.deleteRecipe);
+router.get("/:id", async (req, res) => {
+  try {
+    const recipe = await recipeService.getById(req.params.id);
+    res.json({ data: { recipe } });
+  } catch (error) {
+    console.error("Recipe fetch error:", error.message);
+    res.status(404).json({ message: "Recipe not found" });
+  }
+});
 
 module.exports = router;

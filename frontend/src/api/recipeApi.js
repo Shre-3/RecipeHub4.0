@@ -1,106 +1,162 @@
-import axios from "axios";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
-const BASE_URL = import.meta.env.VITE_BASE_URL;
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
-export async function searchRecipes(query) {
-  const response = await fetch(`${BASE_URL}?search=${query}`);
-  if (!response.ok) throw new Error("Failed to fetch recipes");
-  const data = await response.json();
+async function readErrorMessage(response, fallback) {
+  const data = await response.json().catch(() => ({}));
+  return data.message || fallback;
+}
 
-  if (!data.data || !Array.isArray(data.data.recipes)) {
-    throw new Error("Unexpected API response format");
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...getAuthHeaders(), ...options.headers },
+  });
+  return response;
+}
+
+export async function login(email, password) {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 401) {
+      throw new Error("Invalid credentials");
+    }
+    throw new Error(data.message || "Login failed. Please try again later.");
   }
 
-  // Transform the Forkify recipe format to our app's format
-  return data.data.recipes.map((recipe) => ({
-    id: recipe.id || recipe._id,
-    name: recipe.title,
-    description: recipe.title,
-    image: recipe.image_url,
-    sourceUrl: recipe.sourceUrl || recipe.source_url || "",
-    cookTime: recipe.cooking_time || 30, // Default value if not provided
-    servings: recipe.servings || 4, // Default value if not provided
-    ingredients: recipe.ingredients
-      ? recipe.ingredients.map((ing) => ({
-          quantity: ing.quantity || 0,
-          unit: ing.unit || "",
-          description: ing.description || "",
-        }))
-      : [],
-    instructions: recipe.cooking_instructions || [],
-    isBookmarked: false,
-    isAIGenerated: recipe.isAIGenerated || false,
-  }));
+  if (!data?.user) {
+    throw new Error("Invalid response from server");
+  }
+
+  return data;
+}
+
+export async function register(username, email, password) {
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.message || "An error occurred");
+  }
+
+  return data;
+}
+
+export async function searchRecipes(query) {
+  const response = await apiFetch(
+    `/recipes/search?q=${encodeURIComponent(query)}`
+  );
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Failed to fetch recipes"));
+  }
+
+  const data = await response.json();
+  return data.data?.recipes || [];
 }
 
 export async function getRecipeById(id) {
-  if (!id) {
-    throw new Error("ID is required to fetch a recipe");
+  if (!id) throw new Error("ID is required to fetch a recipe");
+
+  const response = await apiFetch(`/recipes/${id}`);
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to fetch recipe details")
+    );
   }
 
-  const response = await fetch(`${BASE_URL}/${id}`);
-  if (!response.ok) throw new Error("Failed to fetch recipe details");
   const data = await response.json();
-
-  if (!data.data || !data.data.recipe) {
-    throw new Error("Recipe not found");
-  }
-  return mapApiRecipe(data.data.recipe);
+  return data.data.recipe;
 }
 
-export async function saveRecipe(recipe) {
-  const token = localStorage.getItem("token"); // or however you store the token
-
-  const transformedRecipe = {
-    title: recipe.name,
-    description: recipe.description,
-    ingredients: recipe.ingredients.map((ing) => ({
-      quantity: ing.quantity,
-      unit: ing.unit,
-      description: ing.description,
-    })),
-    instructions: recipe.instructions,
-    cooking_time: recipe.cookTime,
-    servings: recipe.servings,
-    image_url: recipe.image,
-    isAIGenerated: recipe.isAIGenerated,
-    sourceUrl: recipe.sourceUrl,
-  };
-
-  const response = await fetch(`${BASE_URL}/api/recipes`, {
+export async function getPantryMatches(ingredients, preferences = {}) {
+  const response = await apiFetch("/recommendations/pantry", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(transformedRecipe),
+    body: JSON.stringify({ ingredients, preferences }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to match pantry ingredients");
+  }
+
+  return data.matches || [];
+}
+
+export async function generateMealPlan(numDays = 7, preferences = {}) {
+  const response = await apiFetch("/recommendations/meal-plan", {
+    method: "POST",
+    body: JSON.stringify({ numDays, preferences }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Failed to save recipe");
+    throw new Error(
+      await readErrorMessage(response, "Failed to generate meal plan")
+    );
   }
 
   const data = await response.json();
-  return mapApiRecipe(data.recipe);
+  return { mealPlan: data.mealPlan, warning: data.warning || null };
 }
 
-function mapApiRecipe(apiRecipe) {
-  return {
-    id: apiRecipe.id || apiRecipe._id,
-    name: apiRecipe.title,
-    publisher: apiRecipe.publisher || "",
-    ingredients: apiRecipe.ingredients
-      ? apiRecipe.ingredients.map((ing) => ({
-          quantity: ing.quantity || null,
-          unit: ing.unit || "",
-          description: ing.description || "",
-        }))
-      : [],
-    image: apiRecipe.image_url,
-    cookTime: apiRecipe.cooking_time || null,
-    servings: apiRecipe.servings || null,
-    sourceUrl: apiRecipe.sourceUrl || apiRecipe.source_url || "",
-    isAIGenerated: apiRecipe.isAIGenerated || false,
-  };
+export async function getLatestMealPlan() {
+  const response = await apiFetch("/recommendations/meal-plan");
+
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Failed to fetch meal plan");
+
+  const data = await response.json();
+  return data.mealPlan;
+}
+
+export async function checkBookmark(recipeId) {
+  const response = await apiFetch(`/bookmarks/check/${recipeId}`);
+
+  if (!response.ok) return false;
+  const data = await response.json();
+  return data.isBookmarked;
+}
+
+export async function addBookmark(recipeId) {
+  const response = await apiFetch("/bookmarks", {
+    method: "POST",
+    body: JSON.stringify({ recipeId }),
+  });
+
+  if (!response.ok) throw new Error("Failed to bookmark recipe");
+}
+
+export async function removeBookmark(recipeId) {
+  const response = await apiFetch(`/bookmarks/${recipeId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) throw new Error("Failed to remove bookmark");
+}
+
+export async function getBookmarks() {
+  const response = await apiFetch("/bookmarks");
+
+  if (!response.ok) throw new Error("Failed to fetch bookmarks");
+
+  return response.json();
 }
