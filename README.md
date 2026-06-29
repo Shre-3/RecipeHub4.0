@@ -1,6 +1,6 @@
 # RecipeHub
 
-A full-stack, **Dockerized** MERN recipe platform powered by the [Forkify API](https://forkify-api.herokuapp.com/). Search recipes, match what is in your pantry, plan weekly meals, and save favourites. It has optional diet, allergy, and cuisine filters on every search flow.
+A full-stack, **Dockerized** **MERN** recipe platform powered by the [Forkify API](https://forkify-api.herokuapp.com/). Search recipes, match what is in your pantry, plan weekly meals, and save favourites. It has optional diet, allergy, and cuisine filters on every search flow.
 
 ![Stack](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
 ![Stack](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
@@ -47,9 +47,9 @@ RecipeHub surfaces **quantified results** so users can compare options at a glan
 
 | Layer        | Technologies                               |
 | ------------ | ------------------------------------------ |
-| Frontend     | React 18, Vite, Tailwind CSS, Lucide icons |
+| Frontend     | React, Vite, Tailwind CSS, Lucide icons |
 | Backend      | Node.js, Express, Mongoose, JWT auth       |
-| Database     | MongoDB 7                                  |
+| Database     | MongoDB                                   |
 | External API | Forkify (free tier)                        |
 | Containers   | Docker                                     |
 
