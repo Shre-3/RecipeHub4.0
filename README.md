@@ -9,6 +9,8 @@ A full-stack, **Dockerized** **MERN** recipe platform powered by the [Forkify AP
 ![Stack](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
 ---
+### Live Demo
+https://recipehub-n7on.onrender.com
 
 ## Highlights
 
@@ -79,5 +81,4 @@ npm run dev
 
 Open http://localhost:5173
 
-### Live Demo
-https://recipehub-n7on.onrender.com
+
