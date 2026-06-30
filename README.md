@@ -10,7 +10,7 @@ A full-stack, **Dockerized** **MERN** recipe platform powered by the [Forkify AP
 
 ---
 ### Live Demo
-https://recipehub-n7on.onrender.com
+https://recipehub4-0-1.onrender.com
 
 ## Highlights
 
